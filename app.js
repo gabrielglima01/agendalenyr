@@ -1,6 +1,6 @@
 // ====== CONFIG ======
-const API_URL = "https://script.google.com/macros/s/AKfycbwNDZMzxP88Le3dyioc0X0_kcrEUDRMQMZqT6NSM74v5C0OEuDrYEXeFFpEfypKuNuV2g/exec"; // .../exec
-const API_KEY = "123456"; // API_KEY
+const API_URL = "https://script.google.com/macros/s/AKfycbweEIMoWROiCDG9Xr_FtmijszoOJmfyqtA2JLM_0aUHdAT9Vq7danlXitiQqzJ-3XHNWg/exec"; // .../exec
+const API_KEY = "123456"; // mesma do Code.gs
 
 const $ = (id) => document.getElementById(id);
 
@@ -106,9 +106,18 @@ function applyFilters(items){
   });
 }
 
-// ====== API ======
-async function apiGetList(){
-  const url = `${API_URL}?action=list&key=${encodeURIComponent(API_KEY)}`;
+// ====== API (GET-only, sem CORS) ======
+function qs(obj){
+  const p = new URLSearchParams();
+  Object.entries(obj).forEach(([k,v])=>{
+    if (v === undefined || v === null) return;
+    p.set(k, String(v));
+  });
+  return p.toString();
+}
+
+async function apiList(){
+  const url = `${API_URL}?${qs({ action:"list", key: API_KEY })}`;
   const res = await fetch(url);
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || "Erro API");
@@ -116,32 +125,23 @@ async function apiGetList(){
 }
 
 async function apiCreate(item){
-  const res = await fetch(`${API_URL}?key=${encodeURIComponent(API_KEY)}`, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ action:"create", ...item })
-  });
+  const url = `${API_URL}?${qs({ action:"create", key: API_KEY, ...item })}`;
+  const res = await fetch(url);
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || "Erro create");
   return json.id;
 }
 
 async function apiUpdate(id, item){
-  const res = await fetch(`${API_URL}?key=${encodeURIComponent(API_KEY)}`, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ action:"update", id, ...item })
-  });
+  const url = `${API_URL}?${qs({ action:"update", key: API_KEY, id, ...item })}`;
+  const res = await fetch(url);
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || "Erro update");
 }
 
 async function apiRemove(id){
-  const res = await fetch(`${API_URL}?key=${encodeURIComponent(API_KEY)}`, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ action:"remove", id })
-  });
+  const url = `${API_URL}?${qs({ action:"remove", key: API_KEY, id })}`;
+  const res = await fetch(url);
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || "Erro remove");
 }
@@ -264,8 +264,14 @@ function startEdit(id){
 async function removeItem(id){
   const ok = confirm("Excluir este agendamento?");
   if (!ok) return;
-  await apiRemove(id);
-  await refresh();
+
+  try {
+    await apiRemove(id);
+    await refresh();
+  } catch (err) {
+    console.error(err);
+    alert("Falha ao excluir: " + (err?.message || err));
+  }
 }
 
 function refreshUI(){
@@ -280,8 +286,7 @@ function refreshUI(){
 }
 
 async function refresh(){
-  ALL = (await apiGetList()) || [];
-  // ordenar por data/hora
+  ALL = (await apiList()) || [];
   ALL.sort((a,b) => (`${a.data}T${a.hora}`).localeCompare(`${b.data}T${b.hora}`));
   refreshUI();
 }
@@ -307,12 +312,18 @@ els.form.addEventListener("submit", async (e) => {
     return;
   }
 
-  const id = els.editId.value;
-  if (id) await apiUpdate(id, payload);
-  else await apiCreate(payload);
+  try {
+    const id = els.editId.value;
+    if (id) await apiUpdate(id, payload);
+    else await apiCreate(payload);
 
-  resetForm();
-  await refresh();
+    resetForm();
+    await refresh();
+    alert("Agendamento salvo!");
+  } catch (err) {
+    console.error(err);
+    alert("Falha ao salvar: " + (err?.message || err));
+  }
 });
 
 els.btnReset.addEventListener("click", resetForm);
@@ -333,7 +344,7 @@ els.btnThisWeek.addEventListener("click", () => {
   refreshUI();
 });
 
-// Export/Import (agora exporta a lista do servidor)
+// Export/Import
 els.btnExport.addEventListener("click", () => {
   const blob = new Blob([JSON.stringify({version:1, exportedAt:new Date().toISOString(), items: ALL}, null, 2)], {type:"application/json"});
   const a = document.createElement("a");
@@ -344,10 +355,10 @@ els.btnExport.addEventListener("click", () => {
   a.remove();
 });
 
-// Import: envia itens para o servidor (create)
 els.fileImport.addEventListener("change", async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
+
   try{
     const text = await file.text();
     const json = JSON.parse(text);
@@ -355,16 +366,15 @@ els.fileImport.addEventListener("change", async (e) => {
     if (!Array.isArray(items)) throw new Error("Formato inválido");
 
     for (const it of items) {
-      // cria registros novos (não reaproveita id antigo)
       await apiCreate({
-        data: it.data || it.date || "",
-        hora: it.hora || it.time || "",
-        duracaoMin: Number(it.duracaoMin || it.duration || 0),
-        setor: it.setor || it.sector || "",
-        solicitante: it.solicitante || it.requester || "",
-        responsavel: it.responsavel || it.owner || "",
-        assunto: it.assunto || it.subject || "",
-        prioridade: it.prioridade || it.priority || "",
+        data: it.data || "",
+        hora: it.hora || "",
+        duracaoMin: Number(it.duracaoMin || 0),
+        setor: it.setor || "",
+        solicitante: it.solicitante || "",
+        responsavel: it.responsavel || "",
+        assunto: it.assunto || "",
+        prioridade: it.prioridade || "",
         status: it.status || ""
       });
     }
@@ -372,13 +382,13 @@ els.fileImport.addEventListener("change", async (e) => {
     alert("Importado com sucesso.");
     await refresh();
   } catch(err){
-    alert("Falha ao importar: " + err.message);
+    console.error(err);
+    alert("Falha ao importar: " + (err?.message || err));
   } finally {
     e.target.value = "";
   }
 });
 
-// Limpar (no multiusuário, não vamos apagar tudo por padrão)
 els.btnClear.addEventListener("click", () => {
   alert("No modo multiusuário, a limpeza total deve ser feita pela planilha (ou posso adicionar um endpoint admin).");
 });
@@ -389,6 +399,7 @@ els.btnClear.addEventListener("click", () => {
   els.dayPicker.value = t;
   els.weekPicker.value = t;
   els.status.value = "Pendente";
+
   try {
     await refresh();
   } catch (e) {
@@ -396,6 +407,3 @@ els.btnClear.addEventListener("click", () => {
     alert("Falha ao conectar na API. Verifique API_URL/API_KEY e se o Web App foi implantado.");
   }
 })();
-
-
-
