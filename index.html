@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Agenda de Reuniões — Controle Executivo</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">AR</div>
+      <div>
+        <div class="title">Agenda de Reuniões</div>
+        <div class="subtitle">Controle Executivo (Web • GitHub Pages)</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btnExport" class="btn ghost" title="Exportar backup em JSON">Exportar</button>
+      <label class="btn ghost file">
+        Importar
+        <input id="fileImport" type="file" accept="application/json" />
+      </label>
+      <button id="btnClear" class="btn danger ghost" title="Apagar todos os dados locais">Limpar</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <div class="cardHead">
+        <h2>Novo agendamento</h2>
+        <p>Preencha e salve. Os dados ficam no seu navegador (localStorage).</p>
+      </div>
+
+      <form id="form" class="formGrid">
+        <div class="field">
+          <label>Data</label>
+          <input id="date" type="date" required />
+        </div>
+
+        <div class="field">
+          <label>Hora início</label>
+          <input id="time" type="time" required />
+        </div>
+
+        <div class="field">
+          <label>Duração (min)</label>
+          <input id="duration" type="number" min="5" step="5" value="40" required />
+        </div>
+
+        <div class="field">
+          <label>Setor</label>
+          <select id="sector" required>
+            <option value="" disabled selected>Selecione…</option>
+            <option>Diretoria</option>
+            <option>Financeiro</option>
+            <option>RH</option>
+            <option>TI</option>
+            <option>Comercial</option>
+            <option>Operações</option>
+          </select>
+        </div>
+
+        <div class="field span2">
+          <label>Solicitante</label>
+          <input id="requester" type="text" placeholder="Ex: Dr. Marcelo – Coord. UTI" required />
+        </div>
+
+        <div class="field span2">
+          <label>Responsável</label>
+          <input id="owner" type="text" placeholder="Ex: Dra. Vera Lúcia" required />
+        </div>
+
+        <div class="field span2">
+          <label>Motivo / Assunto</label>
+          <select id="subject" required>
+            <option value="" disabled selected>Selecione…</option>
+            <option>Assistencial</option>
+            <option>Administrativo</option>
+            <option>Escala/Plantão</option>
+            <option>Fluxo de Pacientes</option>
+            <option>Segurança do Paciente</option>
+            <option>Tecnologia/Sistema</option>
+            <option>Urgente</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Prioridade</label>
+          <select id="priority" required>
+            <option value="" disabled selected>Selecione…</option>
+            <option>Alta</option>
+            <option>Média</option>
+            <option>Baixa</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Status</label>
+          <select id="status" required>
+            <option>Pendente</option>
+            <option>Em andamento</option>
+            <option>Concluído</option>
+            <option>Cancelado</option>
+          </select>
+        </div>
+
+        <div class="formActions span4">
+          <input type="hidden" id="editId" />
+          <button class="btn primary" type="submit" id="btnSave">Salvar</button>
+          <button class="btn" type="button" id="btnReset">Limpar campos</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="grid2">
+      <section class="card">
+        <div class="cardHead row">
+          <div>
+            <h2>Agenda do dia</h2>
+            <p>Visão rápida por data.</p>
+          </div>
+          <div class="inline">
+            <input id="dayPicker" type="date" />
+            <button id="btnToday" class="btn ghost">Hoje</button>
+          </div>
+        </div>
+        <div id="dayView" class="agendaList"></div>
+      </section>
+
+      <section class="card">
+        <div class="cardHead row">
+          <div>
+            <h2>Agenda semanal</h2>
+            <p>Visão de segunda a sexta.</p>
+          </div>
+          <div class="inline">
+            <input id="weekPicker" type="date" />
+            <button id="btnThisWeek" class="btn ghost">Esta semana</button>
+          </div>
+        </div>
+        <div id="weekView" class="weekGrid"></div>
+      </section>
+    </section>
+
+    <section class="card">
+      <div class="cardHead row">
+        <div>
+          <h2>Controle (lista)</h2>
+          <p>Filtre, pesquise e gerencie os registros.</p>
+        </div>
+        <div class="filters">
+          <input id="q" type="search" placeholder="Buscar (nome, setor, assunto…)" />
+          <select id="fSector">
+            <option value="">Setor (todos)</option>
+            <option>Diretoria</option><option>Financeiro</option><option>RH</option>
+            <option>TI</option><option>Comercial</option><option>Operações</option>
+          </select>
+          <select id="fPriority">
+            <option value="">Prioridade (todas)</option>
+            <option>Alta</option><option>Média</option><option>Baixa</option>
+          </select>
+          <select id="fStatus">
+            <option value="">Status (todos)</option>
+            <option>Pendente</option><option>Em andamento</option><option>Concluído</option><option>Cancelado</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table" id="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Hora</th>
+              <th>Setor</th>
+              <th>Solicitante</th>
+              <th>Duração</th>
+              <th>Responsável</th>
+              <th>Assunto</th>
+              <th>Prioridade</th>
+              <th>Status</th>
+              <th style="width:140px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Dados locais: <b>localStorage</b> • Faça backup em <b>Exportar</b>.</span>
+      <span class="muted">Versão estática para GitHub Pages.</span>
+    </footer>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
