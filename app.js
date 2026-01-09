@@ -1,6 +1,6 @@
 // ====== CONFIG ======
-const API_URL = "https://script.google.com/macros/s/AKfycbwtGkqjVZ_X5ogZ44D7grvIjb3-A69uRVz8pkCxssfmojx5y_hlURYTcLBkIgSimJpBvg/exec"; // .../exec
-const API_KEY = ""; // API_KEY
+const API_URL = "https://script.google.com/macros/s/AKfycbwNDZMzxP88Le3dyioc0X0_kcrEUDRMQMZqT6NSM74v5C0OEuDrYEXeFFpEfypKuNuV2g/exec"; // .../exec
+const API_KEY = "123456"; // API_KEY
 
 const $ = (id) => document.getElementById(id);
 
@@ -396,5 +396,6 @@ els.btnClear.addEventListener("click", () => {
     alert("Falha ao conectar na API. Verifique API_URL/API_KEY e se o Web App foi implantado.");
   }
 })();
+
 
 
