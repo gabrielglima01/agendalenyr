@@ -1,4 +1,6 @@
-const STORAGE_KEY = "agenda_reunioes_v1";
+// ====== CONFIG ======
+const API_URL = "AKfycbyWL_aJfXCWOZuBeXzai8H2hZufuT_4coVS24yxBJsDNFFjTS7iFdau0pbG_JCXHT8Y"; // .../exec
+const API_KEY = "AKfycbyWL_aJfXCWOZuBeXzai8H2hZufuT_4coVS24yxBJsDNFFjTS7iFdau0pbG_JCXHT8Y"; // API_KEY
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,45 +37,33 @@ const els = {
   btnThisWeek: $("btnThisWeek"),
 };
 
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveData(items) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-function uid() {
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
-}
-
 function pad2(n){ return String(n).padStart(2, "0"); }
-
-function formatBR(dateStr) {
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+function formatBR(dateStr){
   if (!dateStr) return "";
   const [y,m,d] = dateStr.split("-");
   return `${d}/${m}/${y}`;
 }
-
 function weekdayBR(dateStr){
   const d = new Date(dateStr + "T00:00:00");
   const names = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
   return names[d.getDay()];
 }
-
 function toDate(dateStr){ return new Date(dateStr + "T00:00:00"); }
-
-function sortItems(items) {
-  return [...items].sort((a,b) => {
-    const da = `${a.date}T${a.time || "00:00"}`;
-    const db = `${b.date}T${b.time || "00:00"}`;
-    return da.localeCompare(db);
-  });
+function addDays(dateStr, n){
+  const d = toDate(dateStr);
+  d.setDate(d.getDate()+n);
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+function startOfWeek(dateStr){
+  const d = toDate(dateStr);
+  const day = d.getDay(); // 0..6
+  const diff = (day === 0 ? -6 : 1) - day; // Monday
+  d.setDate(d.getDate() + diff);
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 }
 
 function badgePriority(p){
@@ -102,13 +92,13 @@ function getFilters(){
 function applyFilters(items){
   const f = getFilters();
   return items.filter(it => {
-    if (f.sector && it.sector !== f.sector) return false;
-    if (f.priority && it.priority !== f.priority) return false;
+    if (f.sector && it.setor !== f.sector) return false;
+    if (f.priority && it.prioridade !== f.priority) return false;
     if (f.status && it.status !== f.status) return false;
 
     if (f.q) {
       const hay = [
-        it.sector, it.requester, it.owner, it.subject, it.priority, it.status, it.time, it.date
+        it.setor, it.solicitante, it.responsavel, it.assunto, it.prioridade, it.status, it.hora, it.data
       ].join(" ").toLowerCase();
       if (!hay.includes(f.q)) return false;
     }
@@ -116,17 +106,58 @@ function applyFilters(items){
   });
 }
 
+// ====== API ======
+async function apiGetList(){
+  const url = `${API_URL}?action=list&key=${encodeURIComponent(API_KEY)}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Erro API");
+  return json.items || [];
+}
+
+async function apiCreate(item){
+  const res = await fetch(`${API_URL}?key=${encodeURIComponent(API_KEY)}`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ action:"create", ...item })
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Erro create");
+  return json.id;
+}
+
+async function apiUpdate(id, item){
+  const res = await fetch(`${API_URL}?key=${encodeURIComponent(API_KEY)}`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ action:"update", id, ...item })
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Erro update");
+}
+
+async function apiRemove(id){
+  const res = await fetch(`${API_URL}?key=${encodeURIComponent(API_KEY)}`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ action:"remove", id })
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Erro remove");
+}
+
+// ====== UI render ======
 function renderTable(items){
   const rows = items.map(it => `
     <tr>
-      <td>${formatBR(it.date)}<div class="muted">${weekdayBR(it.date)}</div></td>
-      <td>${it.time || ""}</td>
-      <td>${it.sector || ""}</td>
-      <td>${it.requester || ""}</td>
-      <td>${it.duration || ""} min</td>
-      <td>${it.owner || ""}</td>
-      <td>${it.subject || ""}</td>
-      <td>${badgePriority(it.priority)}</td>
+      <td>${formatBR(it.data)}<div class="muted">${weekdayBR(it.data)}</div></td>
+      <td>${it.hora || ""}</td>
+      <td>${it.setor || ""}</td>
+      <td>${it.solicitante || ""}</td>
+      <td>${it.duracaoMin || ""} min</td>
+      <td>${it.responsavel || ""}</td>
+      <td>${it.assunto || ""}</td>
+      <td>${badgePriority(it.prioridade)}</td>
       <td>${badgeStatus(it.status)}</td>
       <td>
         <div class="rowActions">
@@ -139,7 +170,6 @@ function renderTable(items){
 
   els.tbody.innerHTML = rows || `<tr><td colspan="10" class="muted">Sem registros.</td></tr>`;
 
-  // bind actions
   els.tbody.querySelectorAll("[data-edit]").forEach(btn => {
     btn.addEventListener("click", () => startEdit(btn.dataset.edit));
   });
@@ -149,7 +179,7 @@ function renderTable(items){
 }
 
 function renderDay(items, dateStr){
-  const dayItems = items.filter(it => it.date === dateStr);
+  const dayItems = items.filter(it => it.data === dateStr);
   if (!dayItems.length){
     els.dayView.innerHTML = `<div class="muted">Sem reuniões para ${formatBR(dateStr)}.</div>`;
     return;
@@ -157,36 +187,15 @@ function renderDay(items, dateStr){
   els.dayView.innerHTML = dayItems.map(it => `
     <div class="item">
       <div>
-        <div><b>${it.time}</b> • ${it.sector} • ${it.subject}</div>
-        <div class="meta">${it.requester} • Resp: ${it.owner} • ${it.duration} min</div>
+        <div><b>${it.hora}</b> • ${it.setor} • ${it.assunto}</div>
+        <div class="meta">${it.solicitante} • Resp: ${it.responsavel} • ${it.duracaoMin} min</div>
       </div>
       <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-        ${badgePriority(it.priority)}
+        ${badgePriority(it.prioridade)}
         ${badgeStatus(it.status)}
       </div>
     </div>
   `).join("");
-}
-
-function startOfWeek(dateStr){
-  // Monday-based week
-  const d = toDate(dateStr);
-  const day = d.getDay(); // 0..6 (Sun..Sat)
-  const diff = (day === 0 ? -6 : 1) - day; // move to Monday
-  d.setDate(d.getDate() + diff);
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth()+1);
-  const dd = pad2(d.getDate());
-  return `${y}-${m}-${dd}`;
-}
-
-function addDays(dateStr, n){
-  const d = toDate(dateStr);
-  d.setDate(d.getDate()+n);
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth()+1);
-  const dd = pad2(d.getDate());
-  return `${y}-${m}-${dd}`;
 }
 
 function renderWeek(items, weekStart){
@@ -199,16 +208,16 @@ function renderWeek(items, weekStart){
   ];
   els.weekView.innerHTML = days.map(d => {
     const date = addDays(weekStart, d.off);
-    const list = items.filter(it => it.date === date);
+    const list = items.filter(it => it.data === date);
     const slots = list.length
       ? list.map(it => `
           <div class="item" style="padding:8px 10px;">
             <div>
-              <div><b>${it.time}</b> • ${it.sector}</div>
-              <div class="meta">${it.subject}</div>
+              <div><b>${it.hora}</b> • ${it.setor}</div>
+              <div class="meta">${it.assunto}</div>
             </div>
             <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-              ${badgePriority(it.priority)}
+              ${badgePriority(it.prioridade)}
               ${badgeStatus(it.status)}
             </div>
           </div>
@@ -225,115 +234,108 @@ function renderWeek(items, weekStart){
   }).join("");
 }
 
+// ====== State ======
+let ALL = [];
+
 function resetForm(){
   els.editId.value = "";
   els.form.reset();
-  // status default
   els.status.value = "Pendente";
 }
 
 function startEdit(id){
-  const data = loadData();
-  const it = data.find(x => x.id === id);
+  const it = ALL.find(x => x.id === id);
   if (!it) return;
 
   els.editId.value = it.id;
-  els.date.value = it.date;
-  els.time.value = it.time;
-  els.duration.value = it.duration;
-  els.sector.value = it.sector;
-  els.requester.value = it.requester;
-  els.owner.value = it.owner;
-  els.subject.value = it.subject;
-  els.priority.value = it.priority;
+  els.date.value = it.data;
+  els.time.value = it.hora;
+  els.duration.value = it.duracaoMin;
+  els.sector.value = it.setor;
+  els.requester.value = it.solicitante;
+  els.owner.value = it.responsavel;
+  els.subject.value = it.assunto;
+  els.priority.value = it.prioridade;
   els.status.value = it.status;
 
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
-function removeItem(id){
+async function removeItem(id){
   const ok = confirm("Excluir este agendamento?");
   if (!ok) return;
-  const data = loadData().filter(x => x.id !== id);
-  saveData(data);
-  refresh();
+  await apiRemove(id);
+  await refresh();
 }
 
-function refresh(){
-  const data = sortItems(loadData());
-  const filtered = applyFilters(data);
+function refreshUI(){
+  const filtered = applyFilters(ALL);
   renderTable(filtered);
 
   const day = els.dayPicker.value || todayStr();
-  renderDay(data, day);
+  renderDay(ALL, day);
 
   const weekStart = startOfWeek(els.weekPicker.value || todayStr());
-  renderWeek(data, weekStart);
+  renderWeek(ALL, weekStart);
 }
 
-function todayStr(){
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth()+1);
-  const dd = pad2(d.getDate());
-  return `${y}-${m}-${dd}`;
+async function refresh(){
+  ALL = (await apiGetList()) || [];
+  // ordenar por data/hora
+  ALL.sort((a,b) => (`${a.data}T${a.hora}`).localeCompare(`${b.data}T${b.hora}`));
+  refreshUI();
 }
 
-// --- Events ---
-els.form.addEventListener("submit", (e) => {
+// ====== Events ======
+els.form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const data = loadData();
 
-  const item = {
-    id: els.editId.value || uid(),
-    date: els.date.value,
-    time: els.time.value,
-    duration: Number(els.duration.value || 0),
-    sector: els.sector.value,
-    requester: els.requester.value.trim(),
-    owner: els.owner.value.trim(),
-    subject: els.subject.value,
-    priority: els.priority.value,
+  const payload = {
+    data: els.date.value,
+    hora: els.time.value,
+    duracaoMin: Number(els.duration.value || 0),
+    setor: els.sector.value,
+    solicitante: els.requester.value.trim(),
+    responsavel: els.owner.value.trim(),
+    assunto: els.subject.value,
+    prioridade: els.priority.value,
     status: els.status.value,
   };
 
-  // basic validation
-  if (!item.date || !item.time || !item.sector || !item.requester || !item.owner || !item.subject || !item.priority || !item.status) {
+  if (!payload.data || !payload.hora || !payload.setor || !payload.solicitante || !payload.responsavel || !payload.assunto || !payload.prioridade || !payload.status) {
     alert("Preencha todos os campos obrigatórios.");
     return;
   }
 
-  const idx = data.findIndex(x => x.id === item.id);
-  if (idx >= 0) data[idx] = item;
-  else data.push(item);
+  const id = els.editId.value;
+  if (id) await apiUpdate(id, payload);
+  else await apiCreate(payload);
 
-  saveData(data);
   resetForm();
-  refresh();
+  await refresh();
 });
 
 els.btnReset.addEventListener("click", resetForm);
 
 ["input","change"].forEach(ev => {
-  [els.q, els.fSector, els.fPriority, els.fStatus].forEach(el => el.addEventListener(ev, refresh));
+  [els.q, els.fSector, els.fPriority, els.fStatus].forEach(el => el.addEventListener(ev, refreshUI));
 });
 
-els.dayPicker.addEventListener("change", refresh);
-els.weekPicker.addEventListener("change", refresh);
+els.dayPicker.addEventListener("change", refreshUI);
+els.weekPicker.addEventListener("change", refreshUI);
 
 els.btnToday.addEventListener("click", () => {
   els.dayPicker.value = todayStr();
-  refresh();
+  refreshUI();
 });
 els.btnThisWeek.addEventListener("click", () => {
   els.weekPicker.value = todayStr();
-  refresh();
+  refreshUI();
 });
 
-// Export/Import/Clear
+// Export/Import (agora exporta a lista do servidor)
 els.btnExport.addEventListener("click", () => {
-  const data = loadData();
-  const blob = new Blob([JSON.stringify({version:1, exportedAt: new Date().toISOString(), items: data}, null, 2)], {type:"application/json"});
+  const blob = new Blob([JSON.stringify({version:1, exportedAt:new Date().toISOString(), items: ALL}, null, 2)], {type:"application/json"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `agenda_reunioes_backup_${todayStr()}.json`;
@@ -342,6 +344,7 @@ els.btnExport.addEventListener("click", () => {
   a.remove();
 });
 
+// Import: envia itens para o servidor (create)
 els.fileImport.addEventListener("change", async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
@@ -350,9 +353,24 @@ els.fileImport.addEventListener("change", async (e) => {
     const json = JSON.parse(text);
     const items = Array.isArray(json) ? json : (json.items || []);
     if (!Array.isArray(items)) throw new Error("Formato inválido");
-    saveData(items);
+
+    for (const it of items) {
+      // cria registros novos (não reaproveita id antigo)
+      await apiCreate({
+        data: it.data || it.date || "",
+        hora: it.hora || it.time || "",
+        duracaoMin: Number(it.duracaoMin || it.duration || 0),
+        setor: it.setor || it.sector || "",
+        solicitante: it.solicitante || it.requester || "",
+        responsavel: it.responsavel || it.owner || "",
+        assunto: it.assunto || it.subject || "",
+        prioridade: it.prioridade || it.priority || "",
+        status: it.status || ""
+      });
+    }
+
     alert("Importado com sucesso.");
-    refresh();
+    await refresh();
   } catch(err){
     alert("Falha ao importar: " + err.message);
   } finally {
@@ -360,18 +378,21 @@ els.fileImport.addEventListener("change", async (e) => {
   }
 });
 
+// Limpar (no multiusuário, não vamos apagar tudo por padrão)
 els.btnClear.addEventListener("click", () => {
-  const ok = confirm("Isso vai apagar TODOS os dados salvos neste navegador. Continuar?");
-  if (!ok) return;
-  localStorage.removeItem(STORAGE_KEY);
-  refresh();
+  alert("No modo multiusuário, a limpeza total deve ser feita pela planilha (ou posso adicionar um endpoint admin).");
 });
 
 // Init
-(function init(){
+(async function init(){
   const t = todayStr();
   els.dayPicker.value = t;
   els.weekPicker.value = t;
   els.status.value = "Pendente";
-  refresh();
+  try {
+    await refresh();
+  } catch (e) {
+    console.error(e);
+    alert("Falha ao conectar na API. Verifique API_URL/API_KEY e se o Web App foi implantado.");
+  }
 })();
