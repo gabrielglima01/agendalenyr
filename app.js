@@ -1,5 +1,5 @@
 // ====== CONFIG ======
-const API_URL = "AKfycbyWL_aJfXCWOZuBeXzai8H2hZufuT_4coVS24yxBJsDNFFjTS7iFdau0pbG_JCXHT8Y"; // .../exec
+const API_URL = "https://script.google.com/macros/s/AKfycbyWL_aJfXCWOZuBeXzai8H2hZufuT_4coVS24yxBJsDNFFjTS7iFdau0pbG_JCXHT8Y/exec"; // .../exec
 const API_KEY = "AKfycbyWL_aJfXCWOZuBeXzai8H2hZufuT_4coVS24yxBJsDNFFjTS7iFdau0pbG_JCXHT8Y"; // API_KEY
 
 const $ = (id) => document.getElementById(id);
@@ -396,3 +396,4 @@ els.btnClear.addEventListener("click", () => {
     alert("Falha ao conectar na API. Verifique API_URL/API_KEY e se o Web App foi implantado.");
   }
 })();
+
